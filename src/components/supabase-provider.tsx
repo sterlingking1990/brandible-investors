@@ -1,0 +1,56 @@
+"use client";
+
+import { createClient } from "@/lib/supabase/client";
+import { Session } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
+import { createContext, useContext, useEffect, useState } from "react";
+
+type SupabaseContextType = {
+  session: Session | null;
+};
+
+const SupabaseContext = createContext<SupabaseContextType | undefined>(
+  undefined
+);
+
+export function SupabaseProvider({
+  children,
+  initialSession,
+}: {
+  children: React.ReactNode;
+  initialSession: Session | null;
+}) {
+  const [session, setSession] = useState(initialSession);
+  const supabase = createClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (newSession?.event === "SIGNED_IN") {
+        router.push("/");
+      }
+      if (newSession?.event === "SIGNED_OUT") {
+        router.push("/login");
+      }
+      setSession(newSession);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [router, supabase.auth]);
+
+  return (
+    <SupabaseContext.Provider value={{ session }}>
+      {children}
+    </SupabaseContext.Provider>
+  );
+}
+
+export const useSupabase = () => {
+  const context = useContext(SupabaseContext);
+  if (context === undefined) {
+    throw new Error("useSupabase must be used within a SupabaseProvider");
+  }
+  return context;
+};
