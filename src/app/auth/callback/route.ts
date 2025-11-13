@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const supabase = createClient(cookieStore)
 
     const { error } = await supabase.auth.verifyOtp({
-      type,
+      type: type as any,
       token_hash,
     })
     if (!error) {

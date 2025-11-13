@@ -1,31 +1,117 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 
 export async function GET() {
-  const mockData = {
-    summary: {
-      totalInvestment: 50000,
-      portfolioValue: 65000,
-      totalReturns: 15000,
-    },
-    recentTransactions: [
-      { id: 1, date: '2025-11-10', description: 'Investment in Brandible Series A', amount: -50000, type: 'investment' },
-      { id: 2, date: '2025-11-11', description: 'Dividend Payout', amount: 1000, type: 'dividend' },
-      { id: 3, date: '2025-11-12', description: 'Stock Sale', amount: 5000, type: 'sale' },
-    ],
-    performance: [
-      { date: '2025-01-01', value: 50000 },
-      { date: '2025-02-01', value: 52000 },
-      { date: '2025-03-01', value: 55000 },
-      { date: '2025-04-01', value: 54000 },
-      { date: '2025-05-01', value: 58000 },
-      { date: '2025-06-01', value: 60000 },
-      { date: '2025-07-01', value: 62000 },
-      { date: '2025-08-01', value: 61000 },
-      { date: '2025-09-01', value: 63000 },
-      { date: '2025-10-01', value: 65000 },
-      { date: '2025-11-01', value: 65000 },
-    ],
-  };
+  const cookieStore = cookies();
+  const supabase = createClient(cookieStore);
 
-  return NextResponse.json(mockData);
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    // Fetch user's profile
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('full_name, user_type, created_at')
+      .eq('id', user.id)
+      .single();
+    
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
+      throw profileError;
+    }
+
+    // Check if user is marked as investor in profile
+    if (profileData?.user_type !== 'investor') {
+      console.log('User is not an investor type, returning empty dashboard');
+      const emptyDashboard = {
+        user: { full_name: profileData?.full_name || 'User' },
+        summary: { total_investment: 0, portfolio_value: 0, total_returns: 0 },
+        recentTransactions: [],
+        performance: [],
+      };
+      return NextResponse.json(emptyDashboard);
+    }
+
+    // Check if investor record exists and get their level
+    const { data: investorData, error: investorCheckError } = await supabase
+      .from('investors')
+      .select(`
+        id,
+        level_id,
+        investor_levels (
+          role_name,
+          interest_factor
+        )
+      `)
+      .eq('profile_id', user.id)
+      .single();
+
+    if (investorCheckError || !investorData) {
+      console.log('No investor record found, returning empty dashboard');
+      const emptyDashboard = {
+        user: profileData,
+        summary: { total_investment: 0, portfolio_value: 0, total_returns: 0 },
+        recentTransactions: [],
+        performance: [],
+      };
+      return NextResponse.json(emptyDashboard);
+    }
+
+    // Now we can safely call the RPC functions
+    let summaryData, transactionsData, performanceData;
+
+    // Fetch summary data
+    try {
+      const { data, error } = await supabase.rpc('get_investor_dashboard_summary', { p_user_id: user.id });
+      if (error) throw error;
+      summaryData = data;
+    } catch (summaryError: any) {
+      console.error('Summary RPC error:', summaryError);
+      summaryData = [];
+    }
+
+    // Fetch recent transactions
+    try {
+      const { data, error } = await supabase.rpc('get_investor_recent_transactions', { p_user_id: user.id });
+      if (error) throw error;
+      transactionsData = data;
+    } catch (transactionsError: any) {
+      console.error('Transactions RPC error:', transactionsError);
+      transactionsData = [];
+    }
+
+    // Fetch performance data
+    try {
+      const { data, error } = await supabase.rpc('get_investor_performance_data', { p_user_id: user.id });
+      if (error) throw error;
+      performanceData = data;
+    } catch (performanceError: any) {
+      console.error('Performance RPC error:', performanceError);
+      performanceData = [];
+    }
+
+    const dashboardData = {
+      user: {
+        full_name: profileData?.full_name,
+        member_since: profileData?.created_at,
+      },
+      summary: (summaryData && summaryData.length > 0) ? summaryData[0] : { total_investment: 0, portfolio_value: 0, total_returns: 0 },
+      recentTransactions: transactionsData || [],
+      performance: performanceData || [],
+      investorLevel: investorData?.investor_levels ? {
+        role_name: investorData.investor_levels.role_name,
+        interest_factor: investorData.investor_levels.interest_factor,
+      } : null,
+    };
+
+    return NextResponse.json(dashboardData);
+  } catch (error: any) {
+    console.error('Error fetching dashboard data:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+  }
 }
