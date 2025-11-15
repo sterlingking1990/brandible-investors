@@ -88,32 +88,36 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch("/api/dashboard");
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch dashboard data");
+    useEffect(() => {
+      const fetchData = async () => {
+        try {
+          const response = await fetch("/api/dashboard");
+  
+          if (response.status === 401) {
+            router.push("/login");
+            return;
+          }
+  
+          if (!response.ok) {
+            throw new Error("Failed to fetch dashboard data");
+          }
+  
+          const data = await response.json();
+          console.log("Dashboard data:", data); // Debug log
+  
+          // Set data even if empty - we'll handle empty state in UI
+          setDashboardData(data);
+          setError(false);
+        } catch (error) {
+          console.error("Failed to fetch dashboard data:", error);
+          setError(true);
+        } finally {
+          setLoading(false);
         }
-
-        const data = await response.json();
-        console.log("Dashboard data:", data); // Debug log
-
-        // Set data even if empty - we'll handle empty state in UI
-        setDashboardData(data);
-        setError(false);
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
-        setError(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
+      };
+  
+      fetchData();
+    }, [router]);
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push("/login");
