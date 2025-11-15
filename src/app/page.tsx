@@ -125,7 +125,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
+      <main className="flex min-h-screen flex-col items-center justify-center p-8 sm:p-12 md:p-24 bg-gray-50">
         <p>Loading dashboard...</p>
       </main>
     );
@@ -134,7 +134,7 @@ export default function Home() {
   // Show error only if API call actually failed
   if (error || !dashboardData) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
+      <main className="flex min-h-screen flex-col items-center justify-center p-8 sm:p-12 md:p-24 bg-gray-50">
         <p className="text-red-500">Failed to load dashboard data. Please try again later.</p>
         <button 
           onClick={() => window.location.reload()} 
@@ -162,9 +162,9 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-100">
       <header className="bg-white shadow-md">
-        <div className="container mx-auto px-4 py-6 flex justify-between items-center">
-          <div className="flex items-center space-x-6">
-            <h1 className="text-3xl font-bold text-gray-800">Welcome, {dashboardData.user?.full_name || 'Investor'}!</h1>
+        <div className="container mx-auto px-4 py-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:space-x-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left">Welcome, {dashboardData.user?.full_name || 'Investor'}!</h1>
             
             {/* Investor Level Badge */}
             {dashboardData.investorLevel && (
