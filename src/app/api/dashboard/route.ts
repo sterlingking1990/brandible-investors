@@ -22,7 +22,10 @@ export async function GET() {
     
     if (profileError) {
       console.error('Profile fetch error:', profileError);
-      throw profileError;
+      if (profileError.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Profile not found for this user.' }, { status: 404 });
+      }
+      return NextResponse.json({ error: 'Failed to fetch profile data' }, { status: 500 });
     }
 
     // Check if user is marked as investor in profile
@@ -44,72 +47,62 @@ export async function GET() {
       .eq('profile_id', user.id)
       .single();
 
+    if (investorCheckError) {
+        console.error('Investor check error:', investorCheckError);
+        // If the error is that no rows were found, we can handle that gracefully
+        if (investorCheckError.code === 'PGRST116') {
+            const emptyDashboard = {
+                user: profileData,
+                summary: { total_investment: 0, portfolio_value: 0, total_returns: 0 },
+                recentTransactions: [],
+                performance: [],
+            };
+            return NextResponse.json(emptyDashboard);
+        }
+        return NextResponse.json({ error: 'Failed to fetch investor data' }, { status: 500 });
+    }
+
+
     // Get investor level data using RPC function (bypasses RLS)
     let investorLevelData = null;
-    console.log('Investor data:', JSON.stringify(investorData, null, 2));
-    
     if (investorData?.id) {
-      console.log('Fetching level using RPC for user:', user.id);
       const { data: levelData, error: levelError } = await supabase
         .rpc('get_investor_level', { p_user_id: user.id });
       
-      console.log('Level data response:', { levelData, levelError });
-      
-      if (!levelError && levelData && levelData.length > 0) {
+      if (levelError) {
+        console.error('Failed to get level data:', levelError);
+        // Decide if you want to fail the whole request or just proceed without level data
+      } else if (levelData && levelData.length > 0) {
         investorLevelData = levelData[0];
-        console.log('Setting investor level data:', investorLevelData);
-      } else {
-        console.log('Failed to get level data:', levelError);
       }
-    } else {
-      console.log('No investor data found');
-    }
-
-    if (investorCheckError || !investorData) {
-      console.log('No investor record found, returning empty dashboard');
-      const emptyDashboard = {
-        user: profileData,
-        summary: { total_investment: 0, portfolio_value: 0, total_returns: 0 },
-        recentTransactions: [],
-        performance: [],
-      };
-      return NextResponse.json(emptyDashboard);
     }
 
     // Now we can safely call the RPC functions
     let summaryData, transactionsData, performanceData;
 
     // Fetch summary data
-    try {
-      const { data, error } = await supabase.rpc('get_investor_dashboard_summary', { p_user_id: user.id });
-      if (error) throw error;
-      summaryData = data;
-    } catch (summaryError: any) {
-      console.error('Summary RPC error:', summaryError);
-      summaryData = [];
+    const { data: summary, error: summaryError } = await supabase.rpc('get_investor_dashboard_summary', { p_user_id: user.id });
+    if (summaryError) {
+        console.error('Summary RPC error:', summaryError);
+        return NextResponse.json({ error: 'Failed to fetch summary data' }, { status: 500 });
     }
+    summaryData = summary;
 
     // Fetch recent transactions
-    try {
-      const { data, error } = await supabase.rpc('get_investor_recent_transactions', { p_user_id: user.id });
-      if (error) throw error;
-      transactionsData = data;
-    } catch (transactionsError: any) {
-      console.error('Transactions RPC error:', transactionsError);
-      transactionsData = [];
+    const { data: transactions, error: transactionsError } = await supabase.rpc('get_investor_recent_transactions', { p_user_id: user.id });
+    if (transactionsError) {
+        console.error('Transactions RPC error:', transactionsError);
+        return NextResponse.json({ error: 'Failed to fetch recent transactions' }, { status: 500 });
     }
+    transactionsData = transactions;
 
     // Fetch performance data
-    try {
-      const { data, error } = await supabase.rpc('get_investor_performance_data', { p_user_id: user.id });
-      if (error) throw error;
-      performanceData = data;
-    } catch (performanceError: any) {
-      console.error('Performance RPC error:', performanceError);
-      performanceData = [];
+    const { data: performance, error: performanceError } = await supabase.rpc('get_investor_performance_data', { p_user_id: user.id });
+    if (performanceError) {
+        console.error('Performance RPC error:', performanceError);
+        return NextResponse.json({ error: 'Failed to fetch performance data' }, { status: 500 });
     }
-
-    console.log('Investor data with levels:', JSON.stringify(investorData, null, 2));
+    performanceData = performance;
     
     const dashboardData = {
       user: {
@@ -124,8 +117,6 @@ export async function GET() {
         interest_factor: investorLevelData.interest_factor,
       } : null,
     };
-
-    console.log('Final dashboard data:', JSON.stringify(dashboardData, null, 2));
 
     return NextResponse.json(dashboardData);
   } catch (error: any) {
