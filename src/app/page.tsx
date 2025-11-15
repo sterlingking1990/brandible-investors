@@ -46,19 +46,60 @@ export default function Home() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  const handlePasswordUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(false);
+
+    // First, reauthenticate the user with their current password
+    if (session?.user?.email) {
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: session.user.email,
+        password: currentPassword,
+      });
+
+      if (reauthError) {
+        setPasswordError("Invalid current password.");
+        return;
+      }
+    }
+
+
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters long");
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      setPasswordError(updateError.message);
+    } else {
+      setPasswordSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('/api/dashboard');
-        
+        const response = await fetch("/api/dashboard");
+
         if (!response.ok) {
-          throw new Error('Failed to fetch dashboard data');
+          throw new Error("Failed to fetch dashboard data");
         }
-        
+
         const data = await response.json();
-        console.log('Dashboard data:', data); // Debug log
-        
+        console.log("Dashboard data:", data); // Debug log
+
         // Set data even if empty - we'll handle empty state in UI
         setDashboardData(data);
         setError(false);
@@ -343,7 +384,7 @@ export default function Home() {
 
             {/* Account Status */}
             <div className="bg-white p-6 rounded-lg shadow">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Account Status</h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Account Settings</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Account Type</span>
@@ -367,6 +408,49 @@ export default function Home() {
                     {summary.total_investment > 0 ? 'Invested' : 'No Investments'}
                   </span>
                 </div>
+              </div>
+              <div className="mt-6">
+                <h4 className="text-md font-semibold text-gray-800 mb-2">Reset Password</h4>
+                <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                  {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
+                  {passwordSuccess && <p className="text-green-500 text-sm">Password updated successfully!</p>}
+                  <div>
+                    <label
+                      htmlFor="currentPassword"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Current Password
+                    </label>
+                    <input
+                      type="password"
+                      id="currentPassword"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="newPassword"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Update Password
+                  </button>
+                </form>
               </div>
             </div>
 

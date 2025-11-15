@@ -2,30 +2,15 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient();
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        setError("No active session. Please use the password reset link from your email.");
-        setTimeout(() => router.push('/login'), 3000);
-      }
-      setLoading(false);
-    };
-
-    checkSession();
-  }, [router, supabase.auth]);
 
   const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -55,16 +40,6 @@ export default function ResetPassword() {
     }
   };
 
-  if (loading) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
-        <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
-          <p className="text-center text-gray-600">Loading...</p>
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
       <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
@@ -75,8 +50,6 @@ export default function ResetPassword() {
           <p className="text-green-500 text-center">
             Password set successfully! Redirecting...
           </p>
-        ) : error && !loading ? (
-          <p className="text-red-500 text-center">{error}</p>
         ) : (
           <form onSubmit={handleResetPassword} className="space-y-4">
             {error && <p className="text-red-500 text-center text-sm">{error}</p>}

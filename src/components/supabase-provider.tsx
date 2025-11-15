@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { Session } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 
 type SupabaseContextType = {
@@ -23,13 +23,16 @@ export function SupabaseProvider({
   const [session, setSession] = useState(initialSession);
   const supabase = createClient();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (event === "SIGNED_IN") {
-        router.push("/");
+        if (pathname !== "/reset-password") {
+          router.push("/");
+        }
       }
       if (event === "SIGNED_OUT") {
         router.push("/login");
@@ -38,7 +41,7 @@ export function SupabaseProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [router, supabase.auth]);
+  }, [router, supabase.auth, pathname]);
 
   return (
     <SupabaseContext.Provider value={{ session }}>
