@@ -10,6 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Brandible Investor Dashboard",
   description: "Manage your investments with Brandible",
+  viewport: "width=device-width, initial-scale=1",
 };
 
 export default async function RootLayout({

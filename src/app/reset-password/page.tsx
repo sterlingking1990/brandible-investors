@@ -41,9 +41,9 @@ export default function ResetPassword() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
-      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold text-gray-800 text-center mb-6">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-24 bg-gray-50">
+      <div className="w-full max-w-md bg-white p-6 sm:p-8 rounded-lg shadow-md">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 text-center mb-6">
           Set Your Password
         </h1>
         {success ? (

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -28,9 +29,9 @@ export default function Login() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
-      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold text-gray-800 text-center mb-6">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-24 bg-gray-50">
+      <div className="w-full max-w-md bg-white p-6 sm:p-8 rounded-lg shadow-md">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 text-center mb-6">
           Investor Login
         </h1>
         <form onSubmit={handleLogin} className="space-y-4">
@@ -68,11 +69,11 @@ export default function Login() {
             />
           </div>
           <div className="text-sm text-center">
-            <a href="/forgot-password"
+            <Link href="/forgot-password"
               className="font-medium text-indigo-600 hover:text-indigo-500"
             >
               Forgot password?
-            </a>
+            </Link>
           </div>
           <button
             type="submit"

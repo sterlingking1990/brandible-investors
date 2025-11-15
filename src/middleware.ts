@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 const authPaths = ['/login']
-const publicPaths = ['/reset-password', '/auth/callback']
+const publicPaths = ['/reset-password', '/auth/callback', '/forgot-password']
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
