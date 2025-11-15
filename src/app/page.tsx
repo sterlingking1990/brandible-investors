@@ -12,6 +12,7 @@ type Transaction = {
   description: string;
   amount: number;
   type: string;
+  created_at: string;
 };
 
 type PerformanceData = {
