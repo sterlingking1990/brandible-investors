@@ -37,19 +37,33 @@ export async function GET() {
       return NextResponse.json(emptyDashboard);
     }
 
-    // Check if investor record exists and get their level
+    // Check if investor record exists 
     const { data: investorData, error: investorCheckError } = await supabase
       .from('investors')
-      .select(`
-        id,
-        level_id,
-        investor_levels (
-          role_name,
-          interest_factor
-        )
-      `)
+      .select('id, level_id')
       .eq('profile_id', user.id)
       .single();
+
+    // Get investor level data using RPC function (bypasses RLS)
+    let investorLevelData = null;
+    console.log('Investor data:', JSON.stringify(investorData, null, 2));
+    
+    if (investorData?.id) {
+      console.log('Fetching level using RPC for user:', user.id);
+      const { data: levelData, error: levelError } = await supabase
+        .rpc('get_investor_level', { p_user_id: user.id });
+      
+      console.log('Level data response:', { levelData, levelError });
+      
+      if (!levelError && levelData && levelData.length > 0) {
+        investorLevelData = levelData[0];
+        console.log('Setting investor level data:', investorLevelData);
+      } else {
+        console.log('Failed to get level data:', levelError);
+      }
+    } else {
+      console.log('No investor data found');
+    }
 
     if (investorCheckError || !investorData) {
       console.log('No investor record found, returning empty dashboard');
@@ -95,6 +109,8 @@ export async function GET() {
       performanceData = [];
     }
 
+    console.log('Investor data with levels:', JSON.stringify(investorData, null, 2));
+    
     const dashboardData = {
       user: {
         full_name: profileData?.full_name,
@@ -103,11 +119,13 @@ export async function GET() {
       summary: (summaryData && summaryData.length > 0) ? summaryData[0] : { total_investment: 0, portfolio_value: 0, total_returns: 0 },
       recentTransactions: transactionsData || [],
       performance: performanceData || [],
-      investorLevel: investorData?.investor_levels ? {
-        role_name: investorData.investor_levels.role_name,
-        interest_factor: investorData.investor_levels.interest_factor,
+      investorLevel: investorLevelData ? {
+        role_name: investorLevelData.role_name,
+        interest_factor: investorLevelData.interest_factor,
       } : null,
     };
+
+    console.log('Final dashboard data:', JSON.stringify(dashboardData, null, 2));
 
     return NextResponse.json(dashboardData);
   } catch (error: any) {
