@@ -3,7 +3,8 @@
 import { useSupabase } from "@/components/supabase-provider";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 // import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 type Transaction = {
@@ -165,6 +166,12 @@ export default function Home() {
         <div className="container mx-auto px-4 py-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div className="flex flex-col sm:flex-row items-center gap-4 sm:space-x-6">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 text-center sm:text-left">Welcome, {dashboardData.user?.full_name || 'Investor'}!</h1>
+            <Link href="/blog" className="text-indigo-600 hover:text-indigo-500 font-medium">
+              View Blog
+            </Link>
+            <Link href="/polls" className="text-indigo-600 hover:text-indigo-500 font-medium">
+              View Polls
+            </Link>
             
             {/* Investor Level Badge */}
             {dashboardData.investorLevel && (
