@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
 
 export async function GET() {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
-
   try {
+    console.log('Creating Supabase client...');
+    const supabase = await createClient();
+    
+    console.log('Supabase client type:', typeof supabase);
+    console.log('Supabase client keys:', Object.keys(supabase));
+    console.log('Has from method?', typeof supabase.from);
+    
     const { data: polls, error } = await supabase
       .from('polls')
       .select('id, question, description, created_at, closes_at, status, author_id, profiles(full_name)')
       .eq('status', 'open')
-      .gt('closes_at', new Date().toISOString()) // Only active polls
+      .gt('closes_at', new Date().toISOString())
       .order('created_at', { ascending: false });
 
     if (error) {
