@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const { id } = params;
   const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = await createClient();
 
   try {
     const { data: blogPost, error } = await supabase
