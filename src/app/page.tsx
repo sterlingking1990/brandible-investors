@@ -94,7 +94,7 @@ export default function Home() {
         try {
           const response = await fetch("/api/dashboard");
   
-          if (response.status === 401) {
+          if (response.status === 401 || response.status === 403) {
             router.push("/login");
             return;
           }

@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { SupabaseProvider } from "@/components/supabase-provider";
 import { createClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,8 +17,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = await createClient();
 
   const {
     data: { session },

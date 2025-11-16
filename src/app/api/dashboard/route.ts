@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { cookies } from 'next/headers';
 
 export async function GET() {
-  const cookieStore = cookies();
-  const supabase = createClient(cookieStore);
+  const supabase = await createClient();
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -30,14 +28,8 @@ export async function GET() {
 
     // Check if user is marked as investor in profile
     if (profileData?.user_type !== 'investor') {
-      console.log('User is not an investor type, returning empty dashboard');
-      const emptyDashboard = {
-        user: { full_name: profileData?.full_name || 'User' },
-        summary: { total_investment: 0, portfolio_value: 0, total_returns: 0 },
-        recentTransactions: [],
-        performance: [],
-      };
-      return NextResponse.json(emptyDashboard);
+      console.log('User is not an investor type, access forbidden.');
+      return NextResponse.json({ error: 'Forbidden: User is not an investor.' }, { status: 403 });
     }
 
     // Check if investor record exists 
