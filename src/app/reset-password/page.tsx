@@ -2,34 +2,69 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [verifying, setVerifying] = useState(true)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   useEffect(() => {
-    // Check if user has a valid session for password reset
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+    const verifyToken = async () => {
+      const token = searchParams.get('token')
+      const type = searchParams.get('type')
       
-      if (!session) {
-        setError('No valid session found. Please use the password reset link from your email.')
+      console.log('Reset password page loaded with:', { token: token ? 'present' : 'missing', type })
+
+      if (!token || type !== 'recovery') {
+        setError('Invalid or missing reset token. Please use the link from your email.')
+        setVerifying(false)
         return
       }
-      
-      console.log('User has valid session for password reset')
+
+      try {
+        setVerifying(true)
+        console.log('Verifying recovery token...')
+
+        // Verify the recovery token and establish a session
+        const { data, error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: token,
+          type: 'recovery'
+        })
+
+        if (verifyError) {
+          console.error('Token verification failed:', verifyError)
+          throw new Error(`Token verification failed: ${verifyError.message}`)
+        }
+
+        console.log('Token verified successfully:', data)
+        
+        // Check if we now have a session
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          throw new Error('Failed to establish recovery session')
+        }
+
+        console.log('Recovery session established')
+        setVerifying(false)
+
+      } catch (err: any) {
+        console.error('Token verification error:', err)
+        setError(err.message || 'Invalid or expired reset link. Please request a new one.')
+        setVerifying(false)
+      }
     }
 
-    checkSession()
-  }, [supabase.auth])
+    verifyToken()
+  }, [searchParams, supabase.auth])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,6 +83,7 @@ export default function ResetPassword() {
     setError('')
 
     try {
+      // Update the user's password using the recovery session
       const { error: updateError } = await supabase.auth.updateUser({
         password: password
       })
@@ -58,14 +94,16 @@ export default function ResetPassword() {
 
       setMessage('Password updated successfully! Redirecting to login...')
       
-      // Wait a moment then redirect to login
+      // Sign out the recovery session and redirect to login
+      await supabase.auth.signOut()
+      
       setTimeout(() => {
         router.push('/login')
       }, 2000)
 
     } catch (err: any) {
       console.error('Password reset error:', err)
-      setError(err.message || 'Failed to reset password. Please try again.')
+      setError(err.message || 'Failed to reset password. Please try again or request a new reset link.')
     } finally {
       setLoading(false)
     }
@@ -75,7 +113,20 @@ export default function ResetPassword() {
     router.push('/forgot-password')
   }
 
-  if (error && !loading) {
+  // Show loading while verifying token
+  if (verifying) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verifying reset link...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error if token verification failed
+  if (error && !verifying) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full space-y-8 p-8">
@@ -85,7 +136,7 @@ export default function ResetPassword() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h2 className="mt-6 text-3xl font-bold text-gray-900">Session Expired</h2>
+            <h2 className="mt-6 text-3xl font-bold text-gray-900">Invalid Reset Link</h2>
             <p className="mt-2 text-sm text-gray-600">{error}</p>
           </div>
           
@@ -109,6 +160,7 @@ export default function ResetPassword() {
     )
   }
 
+  // Show password reset form
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">

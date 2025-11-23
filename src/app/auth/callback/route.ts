@@ -1,30 +1,26 @@
-// src/app/auth/callback/route.ts
+// src/app/auth/callback/route.ts - Alternative version
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const { searchParams } = requestUrl
-  const code = searchParams.get('code')
+  const token = searchParams.get('token')
+  const type = searchParams.get('type')
   
-  console.log('Auth callback called with URL:', requestUrl.toString())
+  console.log('Auth callback parameters:', { token: token ? 'present' : 'missing', type })
 
-  if (code) {
-    console.log('Exchanging code for session')
-    const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+  // Handle password reset flow
+  if (type === 'recovery' && token) {
+    console.log('Password reset flow detected, redirecting to reset-password with token')
     
-    if (error) {
-      console.error('Error exchanging code:', error)
-      return NextResponse.redirect(new URL('/auth/auth-code-error', requestUrl.origin))
-    }
-
-    console.log('Code exchange successful, redirecting to reset-password')
-    // Redirect to reset-password after successful session establishment
-    return NextResponse.redirect(new URL('/reset-password', requestUrl.origin))
+    // Simply pass the token to the reset-password page
+    const resetPasswordUrl = new URL('/reset-password', requestUrl.origin)
+    resetPasswordUrl.searchParams.set('token', token)
+    resetPasswordUrl.searchParams.set('type', 'recovery')
+    return NextResponse.redirect(resetPasswordUrl)
   }
 
-  // If no code, redirect to error
-  console.log('No code parameter found')
+  // Handle other cases
+  console.log('Invalid callback parameters')
   return NextResponse.redirect(new URL('/auth/auth-code-error', requestUrl.origin))
 }
