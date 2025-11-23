@@ -72,9 +72,11 @@ export async function middleware(request: NextRequest) {
 
   // Special case: allow reset-password with token parameter (password reset flow)
   const isResetPasswordWithToken = pathname === '/reset-password' && searchParams.has('token')
+  const isAuthCallbackWithRecovery = pathname === '/auth/callback' && 
+    (searchParams.get('type') === 'recovery' || searchParams.get('next')?.includes('reset-password'))
 
-  // Allow public paths and reset-password with token without authentication check
-  if (isPublicPath || isResetPasswordWithToken) {
+  // Allow public paths, reset-password with token, and auth callback with recovery without authentication check
+  if (isPublicPath || isResetPasswordWithToken || isAuthCallbackWithRecovery) {
     return response
   }
 
