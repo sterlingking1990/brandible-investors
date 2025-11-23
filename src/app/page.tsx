@@ -47,6 +47,7 @@ export default function Home() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -86,6 +87,9 @@ export default function Home() {
       setPasswordSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
+
+        // Refresh session to ensure it stays valid
+      await supabase.auth.refreshSession();
     }
   };
 
@@ -95,24 +99,31 @@ export default function Home() {
           const response = await fetch("/api/dashboard");
   
           if (response.status === 401 || response.status === 403) {
+            setRedirecting(true);
+            setLoading(false); // Stop loading before redirect
             router.push("/login");
             return;
-          }
-  
-          if (!response.ok) {
+          } else if (!response.ok) {
             throw new Error("Failed to fetch dashboard data");
           }
   
           const data = await response.json();
-          console.log("Dashboard data:", data); // Debug log
   
           // Set data even if empty - we'll handle empty state in UI
           setDashboardData(data);
           setError(false);
+          setLoading(false);
         } catch (error) {
           console.error("Failed to fetch dashboard data:", error);
+          // Check if it's an auth error that returned HTML instead of JSON
+          if (error instanceof SyntaxError) {
+            // Likely got HTML login page instead of JSON
+            setRedirecting(true);
+            setLoading(false);
+            router.push("/login");
+            return;
+          }
           setError(true);
-        } finally {
           setLoading(false);
         }
       };
@@ -123,6 +134,14 @@ export default function Home() {
     await supabase.auth.signOut();
     router.push("/login");
   };
+
+  if (redirecting) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-8 sm:p-12 md:p-24 bg-gray-50">
+        <p>Redirecting to login...</p>
+      </main>
+    );
+  }
 
   if (loading) {
     return (

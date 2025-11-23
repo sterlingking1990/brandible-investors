@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 const authPaths = ['/login']
-const publicPaths = ['/reset-password', '/auth/callback', '/forgot-password']
+const publicPaths = ['/reset-password', '/auth/callback', '/forgot-password', '/auth/auth-code-error']
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -59,19 +59,28 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  const { pathname } = request.nextUrl
+
+  // Check if the current path is public (using startsWith for flexibility)
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
+  const isAuthPath = authPaths.some(path => pathname.startsWith(path))
+
+  // Allow public paths without authentication check
+  if (isPublicPath) {
+    return response
+  }
+
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
-  const { pathname } = request.nextUrl
-
   // If user is not logged in and tries to access a protected route, redirect to login
-  if (!session && !publicPaths.includes(pathname) && !authPaths.includes(pathname)) {
+  if (!session && !isAuthPath) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // If user is logged in and tries to access an auth page, redirect to home
-  if (session && authPaths.includes(pathname)) {
+  if (session && isAuthPath) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -90,4 +99,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\.(?:png|jpg|jpeg|gif|webp|svg|ico|mp4|webm|ogg|wav|mp3|mov|flv|wmv|avi|ttf|woff|woff2|eot|json)).*)',
   ],
 }
-
