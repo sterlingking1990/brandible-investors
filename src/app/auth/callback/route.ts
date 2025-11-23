@@ -6,59 +6,25 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const { searchParams } = requestUrl
   const code = searchParams.get('code')
-  const token = searchParams.get('token')
-  const next = searchParams.get('next') ?? '/'
-  const type = searchParams.get('type')
+  
+  console.log('Auth callback called with URL:', requestUrl.toString())
 
-  console.log('Auth callback received:', { code, token, next, type })
-
-  // Handle password reset flow - be more specific about the conditions
-  const isRecoveryFlow = type === 'recovery' || next.includes('reset-password') || token !== null
-
-  if (isRecoveryFlow) {
-    console.log('Processing recovery flow')
-    
-    if (token) {
-      console.log('Token found, redirecting to reset-password with token')
-      const resetPasswordUrl = new URL('/reset-password', requestUrl.origin)
-      resetPasswordUrl.searchParams.set('token', token)
-      resetPasswordUrl.searchParams.set('type', 'recovery')
-      return NextResponse.redirect(resetPasswordUrl)
-    } else if (code) {
-      console.log('Code found, exchanging code for session')
-      const supabase = await createClient()
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-      
-      if (!error) {
-        console.log('Code exchange successful, redirecting to reset-password')
-        const resetPasswordUrl = new URL('/reset-password', requestUrl.origin)
-        return NextResponse.redirect(resetPasswordUrl)
-      } else {
-        console.log('Code exchange error:', error)
-        return NextResponse.redirect(new URL('/auth/auth-code-error', requestUrl.origin))
-      }
-    } else {
-      console.log('No token or code found in recovery flow')
-      return NextResponse.redirect(new URL('/auth/auth-code-error', requestUrl.origin))
-    }
-  }
-
-  // Handle regular OAuth flow (with code)
   if (code) {
-    console.log('Processing regular OAuth flow')
+    console.log('Exchanging code for session')
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error) {
-      console.log('OAuth successful, redirecting to:', next)
-      return NextResponse.redirect(new URL(next, requestUrl.origin))
-    } else {
-      console.log('OAuth error:', error)
+    if (error) {
+      console.error('Error exchanging code:', error)
       return NextResponse.redirect(new URL('/auth/auth-code-error', requestUrl.origin))
     }
+
+    console.log('Code exchange successful, redirecting to reset-password')
+    // Redirect to reset-password after successful session establishment
+    return NextResponse.redirect(new URL('/reset-password', requestUrl.origin))
   }
 
-  // If there's an error or no code, redirect to an error page
-  console.log('Final fallback - no valid parameters found')
+  // If no code, redirect to error
+  console.log('No code parameter found')
   return NextResponse.redirect(new URL('/auth/auth-code-error', requestUrl.origin))
 }

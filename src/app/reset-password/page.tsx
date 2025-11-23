@@ -11,66 +11,24 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  const [isValidToken, setIsValidToken] = useState<boolean | null>(null)
   
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    const handlePasswordReset = async () => {
-      try {
-        setLoading(true)
-        
-        // Get the hash from the URL (Supabase puts tokens in the hash fragment)
-        const hash = window.location.hash
-        console.log('URL hash:', hash)
-        
-        if (!hash) {
-          setError('No reset token found in URL. Please use the link from your email.')
-          setIsValidToken(false)
-          return
-        }
-
-        // Check if we're in a recovery flow by looking for recovery tokens
-        const urlParams = new URLSearchParams(hash.substring(1)) // Remove the # and parse
-        const type = urlParams.get('type')
-        const accessToken = urlParams.get('access_token')
-        const refreshToken = urlParams.get('refresh_token')
-        
-        console.log('Recovery flow params:', { type, accessToken: !!accessToken, refreshToken: !!refreshToken })
-
-        if (type === 'recovery' && accessToken) {
-          // We're in a password reset flow, set the session
-          const { data: { session }, error: sessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken || '',
-          })
-
-          if (sessionError) {
-            console.error('Session error:', sessionError)
-            throw new Error('Invalid or expired reset link. Please request a new one.')
-          }
-
-          if (session) {
-            console.log('Recovery session established')
-            setIsValidToken(true)
-          } else {
-            throw new Error('Failed to establish recovery session')
-          }
-        } else {
-          throw new Error('Invalid reset link format')
-        }
-        
-      } catch (err: any) {
-        console.error('Token validation error:', err)
-        setError(err.message || 'Invalid or expired reset link. Please request a new reset link.')
-        setIsValidToken(false)
-      } finally {
-        setLoading(false)
+    // Check if user has a valid session for password reset
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        setError('No valid session found. Please use the password reset link from your email.')
+        return
       }
+      
+      console.log('User has valid session for password reset')
     }
 
-    handlePasswordReset()
+    checkSession()
   }, [supabase.auth])
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -90,7 +48,6 @@ export default function ResetPassword() {
     setError('')
 
     try {
-      // Update the user's password using the recovery session
       const { error: updateError } = await supabase.auth.updateUser({
         password: password
       })
@@ -101,16 +58,14 @@ export default function ResetPassword() {
 
       setMessage('Password updated successfully! Redirecting to login...')
       
-      // Sign out the recovery session and redirect to login
-      await supabase.auth.signOut()
-      
+      // Wait a moment then redirect to login
       setTimeout(() => {
         router.push('/login')
       }, 2000)
 
     } catch (err: any) {
       console.error('Password reset error:', err)
-      setError(err.message || 'Failed to reset password. Please try again or request a new reset link.')
+      setError(err.message || 'Failed to reset password. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -120,20 +75,7 @@ export default function ResetPassword() {
     router.push('/forgot-password')
   }
 
-  // Show loading while checking token
-  if (loading && isValidToken === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Setting up password reset...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Show error if invalid token
-  if (isValidToken === false) {
+  if (error && !loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full space-y-8 p-8">
@@ -143,10 +85,8 @@ export default function ResetPassword() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h2 className="mt-6 text-3xl font-bold text-gray-900">Invalid Reset Link</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              {error || 'This password reset link is invalid or has expired.'}
-            </p>
+            <h2 className="mt-6 text-3xl font-bold text-gray-900">Session Expired</h2>
+            <p className="mt-2 text-sm text-gray-600">{error}</p>
           </div>
           
           <div className="mt-8 space-y-4">
@@ -169,7 +109,6 @@ export default function ResetPassword() {
     )
   }
 
-  // Show password reset form
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">

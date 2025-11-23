@@ -77,7 +77,7 @@ export async function middleware(request: NextRequest) {
   const hasHashParams = hash.includes('access_token') || hash.includes('type=recovery')
 
   // Allow public paths, reset-password page, and reset-password with hash params
-  if (isPublicPath || isResetPasswordPage || hasHashParams) {
+  if (isPublicPath) {
     return response
   }
 
