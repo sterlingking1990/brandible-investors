@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPassword() {
@@ -14,36 +14,63 @@ export default function ResetPassword() {
   const [isValidToken, setIsValidToken] = useState<boolean | null>(null)
   
   const router = useRouter()
-  const searchParams = useSearchParams()
   const supabase = createClient()
 
   useEffect(() => {
-    // Check if we have a valid password reset context
-    // Supabase automatically handles token verification through the URL
-    const checkResetContext = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      // If we have a session and user is authenticated, they shouldn't be here
-      if (session) {
-        setError('You are already logged in. Please log out to reset your password.')
-        setIsValidToken(false)
-        return
-      }
+    const handlePasswordReset = async () => {
+      try {
+        setLoading(true)
+        
+        // Get the hash from the URL (Supabase puts tokens in the hash fragment)
+        const hash = window.location.hash
+        console.log('URL hash:', hash)
+        
+        if (!hash) {
+          setError('No reset token found in URL. Please use the link from your email.')
+          setIsValidToken(false)
+          return
+        }
 
-      // Check if we're in a password reset context by looking at URL parameters
-      // Supabase password reset tokens come in the URL fragment
-      const urlParams = new URLSearchParams(window.location.search)
-      const hasToken = urlParams.has('token') || window.location.hash.includes('access_token')
-      
-      if (!hasToken) {
-        setError('Invalid or expired password reset link. Please request a new reset link.')
+        // Check if we're in a recovery flow by looking for recovery tokens
+        const urlParams = new URLSearchParams(hash.substring(1)) // Remove the # and parse
+        const type = urlParams.get('type')
+        const accessToken = urlParams.get('access_token')
+        const refreshToken = urlParams.get('refresh_token')
+        
+        console.log('Recovery flow params:', { type, accessToken: !!accessToken, refreshToken: !!refreshToken })
+
+        if (type === 'recovery' && accessToken) {
+          // We're in a password reset flow, set the session
+          const { data: { session }, error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          })
+
+          if (sessionError) {
+            console.error('Session error:', sessionError)
+            throw new Error('Invalid or expired reset link. Please request a new one.')
+          }
+
+          if (session) {
+            console.log('Recovery session established')
+            setIsValidToken(true)
+          } else {
+            throw new Error('Failed to establish recovery session')
+          }
+        } else {
+          throw new Error('Invalid reset link format')
+        }
+        
+      } catch (err: any) {
+        console.error('Token validation error:', err)
+        setError(err.message || 'Invalid or expired reset link. Please request a new reset link.')
         setIsValidToken(false)
-      } else {
-        setIsValidToken(true)
+      } finally {
+        setLoading(false)
       }
     }
 
-    checkResetContext()
+    handlePasswordReset()
   }, [supabase.auth])
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -61,11 +88,9 @@ export default function ResetPassword() {
 
     setLoading(true)
     setError('')
-    setMessage('')
 
     try {
-      // Update the user's password
-      // Supabase will automatically use the token from the URL
+      // Update the user's password using the recovery session
       const { error: updateError } = await supabase.auth.updateUser({
         password: password
       })
@@ -76,15 +101,16 @@ export default function ResetPassword() {
 
       setMessage('Password updated successfully! Redirecting to login...')
       
-      // Redirect to login after successful password reset
+      // Sign out the recovery session and redirect to login
+      await supabase.auth.signOut()
+      
       setTimeout(() => {
         router.push('/login')
-      }, 3000)
+      }, 2000)
 
     } catch (err: any) {
       console.error('Password reset error:', err)
-      setError(err.message || 'Failed to reset password. The link may have expired. Please request a new reset link.')
-      setIsValidToken(false)
+      setError(err.message || 'Failed to reset password. Please try again or request a new reset link.')
     } finally {
       setLoading(false)
     }
@@ -95,19 +121,19 @@ export default function ResetPassword() {
   }
 
   // Show loading while checking token
-  if (isValidToken === null) {
+  if (loading && isValidToken === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verifying reset link...</p>
+          <p className="mt-4 text-gray-600">Setting up password reset...</p>
         </div>
       </div>
     )
   }
 
   // Show error if invalid token
-  if (!isValidToken) {
+  if (isValidToken === false) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full space-y-8 p-8">
@@ -172,6 +198,7 @@ export default function ResetPassword() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={6}
+                disabled={loading}
               />
             </div>
 
@@ -189,6 +216,7 @@ export default function ResetPassword() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 minLength={6}
+                disabled={loading}
               />
             </div>
           </div>

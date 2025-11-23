@@ -64,17 +64,20 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { pathname, searchParams } = request.nextUrl
+  const { pathname, searchParams, hash } = request.nextUrl
 
   // Check if the current path is public
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
   const isAuthPath = authPaths.some(path => pathname.startsWith(path))
 
-  // Special case: allow reset-password with ANY parameters (for password reset flow)
+  // Special case: allow reset-password with ANY parameters or hash (for password reset flow)
   const isResetPasswordPage = pathname === '/reset-password'
+  
+  // Special case: check if this is coming from Supabase verification with hash parameters
+  const hasHashParams = hash.includes('access_token') || hash.includes('type=recovery')
 
-  // Allow public paths and reset-password page without authentication check
-  if (isPublicPath || isResetPasswordPage) {
+  // Allow public paths, reset-password page, and reset-password with hash params
+  if (isPublicPath || isResetPasswordPage || hasHashParams) {
     return response
   }
 
