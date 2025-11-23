@@ -5,25 +5,34 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
+  const token = searchParams.get('token') // ← Add this
   const next = searchParams.get('next') ?? '/'
   const type = searchParams.get('type')
 
-  // For password reset, redirect to the reset-password page
+  // Handle password reset flow (using token instead of code)
   if (type === 'recovery' || next.includes('reset-password')) {
-    if (!code) {
-      return NextResponse.redirect(new URL('/auth/auth-code-error', request.url))
-    }
-    
-    const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code) // ✅ Now code is guaranteed to be string
-    
-    if (!error) {
+    if (token) {
+      // For token-based verification, redirect directly to reset-password
       const resetPasswordUrl = new URL('/reset-password', request.url)
+      resetPasswordUrl.searchParams.set('token', token)
+      resetPasswordUrl.searchParams.set('type', 'recovery')
       return NextResponse.redirect(resetPasswordUrl)
+    } else if (code) {
+      // If there's a code (older flow), use exchangeCodeForSession
+      const supabase = await createClient()
+      const { error } = await supabase.auth.exchangeCodeForSession(code)
+      
+      if (!error) {
+        const resetPasswordUrl = new URL('/reset-password', request.url)
+        return NextResponse.redirect(resetPasswordUrl)
+      }
     }
+    
+    // If neither token nor code, go to error
+    return NextResponse.redirect(new URL('/auth/auth-code-error', request.url))
   }
 
-  // Regular authentication flow
+  // Handle regular OAuth flow (with code)
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)

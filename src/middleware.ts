@@ -64,14 +64,17 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { pathname } = request.nextUrl
+  const { pathname, searchParams } = request.nextUrl
 
   // Check if the current path is public
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
   const isAuthPath = authPaths.some(path => pathname.startsWith(path))
 
-  // Allow public paths without authentication check
-  if (isPublicPath) {
+  // Special case: allow reset-password with token parameter (password reset flow)
+  const isResetPasswordWithToken = pathname === '/reset-password' && searchParams.has('token')
+
+  // Allow public paths and reset-password with token without authentication check
+  if (isPublicPath || isResetPasswordWithToken) {
     return response
   }
 
