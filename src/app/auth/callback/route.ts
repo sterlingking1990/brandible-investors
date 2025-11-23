@@ -8,16 +8,25 @@ export async function GET(request: Request) {
   const token = searchParams.get('token') // ← Add this
   const next = searchParams.get('next') ?? '/'
   const type = searchParams.get('type')
+  console.log('Auth callback received with params:', {
+    code,
+    token,
+    next,
+    type,
+  })
 
   // Handle password reset flow (using token instead of code)
   if (type === 'recovery' || next.includes('reset-password')) {
     if (token) {
+      console.log('Handling password reset with token', token)
       // For token-based verification, redirect directly to reset-password
       const resetPasswordUrl = new URL('/reset-password', request.url)
       resetPasswordUrl.searchParams.set('token', token)
       resetPasswordUrl.searchParams.set('type', 'recovery')
+      console.log('Redirecting to:', resetPasswordUrl.toString())
       return NextResponse.redirect(resetPasswordUrl)
     } else if (code) {
+      console.log('Handling password reset with code', code)
       // If there's a code (older flow), use exchangeCodeForSession
       const supabase = await createClient()
       const { error } = await supabase.auth.exchangeCodeForSession(code)
