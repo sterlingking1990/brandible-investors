@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   try {
@@ -18,7 +19,34 @@ export async function GET(request: Request) {
 
     if (token_hash && type) {
       console.log('Creating Supabase client...')
-      const supabase = await createClient();
+      
+      // Inline client creation to avoid import issues
+      const cookieStore = await cookies()
+      const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            get(name: string) {
+              return cookieStore.get(name)?.value
+            },
+            set(name: string, value: string, options: CookieOptions) {
+              try {
+                cookieStore.set({ name, value, ...options })
+              } catch (error) {
+                // Handle error
+              }
+            },
+            remove(name: string, options: CookieOptions) {
+              try {
+                cookieStore.set({ name, value: '', ...options })
+              } catch (error) {
+                // Handle error
+              }
+            },
+          },
+        }
+      )
       
       console.log('Verifying OTP...')
       const { data, error } = await supabase.auth.verifyOtp({
