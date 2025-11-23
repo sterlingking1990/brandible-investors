@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -11,6 +11,8 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const message = searchParams?.get('message');
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -35,7 +37,12 @@ export default function Login() {
           Investor Login
         </h1>
         <form onSubmit={handleLogin} className="space-y-4">
-          {error && <p className="text-red-500 text-center">{error}</p>}
+          {message && (
+            <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+              {message}
+            </div>
+          )}
+          {error && <p className="text-red-500 text-center text-sm">{error}</p>}
           <div>
             <label
               htmlFor="email"
