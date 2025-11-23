@@ -9,12 +9,21 @@ export async function GET(request: Request) {
   const type = searchParams.get('type')
 
   // For password reset, redirect to the reset-password page
-  // The client-side will handle the session from the URL hash
   if (type === 'recovery' || next.includes('reset-password')) {
-    const resetPasswordUrl = new URL('/reset-password', request.url)
-    return NextResponse.redirect(resetPasswordUrl)
+    if (!code) {
+      return NextResponse.redirect(new URL('/auth/auth-code-error', request.url))
+    }
+    
+    const supabase = await createClient()
+    const { error } = await supabase.auth.exchangeCodeForSession(code) // ✅ Now code is guaranteed to be string
+    
+    if (!error) {
+      const resetPasswordUrl = new URL('/reset-password', request.url)
+      return NextResponse.redirect(resetPasswordUrl)
+    }
   }
 
+  // Regular authentication flow
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
