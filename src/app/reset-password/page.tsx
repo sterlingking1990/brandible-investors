@@ -1,8 +1,9 @@
+// src/app/reset-password/page.tsx
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
@@ -10,8 +11,22 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setHasSession(!!session);
+      
+      if (!session) {
+        setError("Invalid or expired reset link. Please request a new password reset.");
+      }
+    };
+
+    checkSession();
+  }, [supabase.auth]);
 
   const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -40,20 +55,46 @@ export default function ResetPassword() {
     } else {
       setSuccess(true);
       
-      // Check if user is authenticated after password reset
-      const { data: { session } } = await supabase.auth.getSession();
+      // Sign out after password reset to ensure clean state
+      await supabase.auth.signOut();
       
       setTimeout(() => {
-        if (session) {
-          // User is logged in, redirect to dashboard
-          router.push("/");
-        } else {
-          // User not logged in, redirect to login
-          router.push("/login?message=Password set successfully! Please log in with your new password.");
-        }
+        router.push("/login?message=Password set successfully! Please log in with your new password.");
       }, 2000);
     }
   };
+
+  if (hasSession === null) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-24 bg-gray-50">
+        <div className="w-full max-w-md bg-white p-6 sm:p-8 rounded-lg shadow-md text-center">
+          <p>Loading...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (hasSession === false) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-24 bg-gray-50">
+        <div className="w-full max-w-md bg-white p-6 sm:p-8 rounded-lg shadow-md text-center">
+          <div className="text-red-600 mb-4">
+            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Invalid Reset Link</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => router.push('/forgot-password')}
+            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Request New Reset Link
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-24 bg-gray-50">
@@ -70,7 +111,7 @@ export default function ResetPassword() {
               Password set successfully!
             </p>
             <p className="text-sm text-gray-600">
-              Redirecting you to your dashboard...
+              Redirecting you to login...
             </p>
           </div>
         ) : (

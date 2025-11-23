@@ -1,10 +1,15 @@
+// middleware.ts
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
-
 import type { NextRequest } from 'next/server'
 
 const authPaths = ['/login']
-const publicPaths = ['/reset-password', '/auth/callback', '/forgot-password', '/auth/auth-code-error']
+const publicPaths = [
+  '/reset-password', 
+  '/auth/callback', 
+  '/forgot-password', 
+  '/auth/auth-code-error'
+]
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -61,7 +66,7 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Check if the current path is public (using startsWith for flexibility)
+  // Check if the current path is public
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
   const isAuthPath = authPaths.some(path => pathname.startsWith(path))
 
@@ -89,13 +94,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - all other public files in the public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:png|jpg|jpeg|gif|webp|svg|ico|mp4|webm|ogg|wav|mp3|mov|flv|wmv|avi|ttf|woff|woff2|eot|json)).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|mp4|webm|ogg|wav|mp3|mov|flv|wmv|avi|ttf|woff|woff2|eot|json)).*)',
   ],
 }
