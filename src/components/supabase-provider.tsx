@@ -30,7 +30,7 @@ export function SupabaseProvider({
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (event === "SIGNED_IN") {
-        if (pathname !== "/reset-password") {
+        if (pathname !== "/reset-password" && pathname !== "/forgot-password") {
           router.push("/");
         }
       }

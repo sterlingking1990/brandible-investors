@@ -8,8 +8,8 @@ import { createClientSync } from "@/lib/supabase/server";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Brandible Investor Dashboard",
-  description: "Manage your investments with Brandible",
+  title: "Brandible | Investor Dashboard",
+  description: "The official dashboard for Brandible investors.",
   viewport: "width=device-width, initial-scale=1",
 };
 

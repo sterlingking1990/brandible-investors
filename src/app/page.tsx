@@ -135,12 +135,20 @@ export default function Home() {
     router.push("/login");
   };
 
-  if (redirecting) {
+  if (!session) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-8 sm:p-12 md:p-24 bg-gray-50">
-        <p>Redirecting to login...</p>
+      <main className="flex min-h-screen flex-col items-center justify-center text-center p-8 bg-gray-50">
+        <div className="max-w-md w-full">
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">Investor Dashboard</h1>
+          <p className="text-gray-600 mb-8">
+            Welcome to the Brandible Investor Dashboard. Log in to manage your investments, track performance, and view exclusive updates.
+          </p>
+          <Link href="/login" className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium">
+            Get Started
+          </Link>
+        </div>
       </main>
-    );
+    )
   }
 
   if (loading) {
