@@ -5,38 +5,39 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
 
+  let response = NextResponse.next()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+
   console.log('Auth callback - params:', { code: !!code })
 
-  // If we have a code, try the modern flow
+  // Handle code exchange (modern flow)
   if (code) {
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value
-          },
-          set(name: string, value: string, options: CookieOptions) {
-            // Handle cookie setting
-          },
-          remove(name: string, options: CookieOptions) {
-            // Handle cookie removal
-          },
-        },
-      }
-    )
-
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
       console.log('✓ Code exchange successful')
-      return NextResponse.redirect(`${origin}/reset-password?verified=true`)
+      return NextResponse.redirect(`${origin}/?password_setup=true`)
     }
     console.error('Code exchange failed:', error)
   }
 
-  // No code means Supabase is using hash fragments
-  // Return a page that will handle the hash client-side
+  // No code - return HTML page to handle hash fragments
   return new Response(`
     <!DOCTYPE html>
     <html>
@@ -54,24 +55,35 @@ export async function GET(request: NextRequest) {
         <p style="margin-top: 16px; color: #6b7280;">Processing reset link...</p>
       </div>
       <script>
-        // Check for tokens in hash
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
         const type = params.get('type');
         
-        console.log('Hash params:', { accessToken: !!accessToken, refreshToken: !!refreshToken, type });
-        
         if (type === 'recovery' && accessToken) {
-          // Redirect to reset password with tokens
-          const resetUrl = new URL('/reset-password', window.location.origin);
-          resetUrl.searchParams.set('access_token', accessToken);
-          if (refreshToken) resetUrl.searchParams.set('refresh_token', refreshToken);
-          resetUrl.searchParams.set('type', 'recovery');
-          window.location.replace(resetUrl.toString());
+          // Create a form to POST the tokens to establish session
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = '/auth/callback';
+          
+          const tokenInput = document.createElement('input');
+          tokenInput.type = 'hidden';
+          tokenInput.name = 'access_token';
+          tokenInput.value = accessToken;
+          form.appendChild(tokenInput);
+          
+          if (refreshToken) {
+            const refreshInput = document.createElement('input');
+            refreshInput.type = 'hidden';
+            refreshInput.name = 'refresh_token';
+            refreshInput.value = refreshToken;
+            form.appendChild(refreshInput);
+          }
+          
+          document.body.appendChild(form);
+          form.submit();
         } else {
-          // No valid tokens, redirect to login
           window.location.replace('/login?message=Invalid or expired reset link. Please try again.');
         }
       </script>
@@ -80,4 +92,53 @@ export async function GET(request: NextRequest) {
   `, {
     headers: { 'Content-Type': 'text/html' },
   })
+}
+
+export async function POST(request: NextRequest) {
+  const formData = await request.formData()
+  const accessToken = formData.get('access_token') as string
+  const refreshToken = formData.get('refresh_token') as string
+
+  if (!accessToken) {
+    return NextResponse.redirect(`${request.nextUrl.origin}/login?message=Invalid reset link`)
+  }
+
+  let response = NextResponse.redirect(`${request.nextUrl.origin}/?password_setup=true`)
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+
+  try {
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken || ''
+    })
+
+    if (error) {
+      console.error('Session setup failed:', error)
+      return NextResponse.redirect(`${request.nextUrl.origin}/login?message=Failed to establish session`)
+    }
+
+    console.log('✓ Session established successfully')
+    return response
+
+  } catch (err) {
+    console.error('Session error:', err)
+    return NextResponse.redirect(`${request.nextUrl.origin}/login?message=Authentication failed`)
+  }
 }
