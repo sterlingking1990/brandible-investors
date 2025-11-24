@@ -19,52 +19,65 @@ export default function ResetPassword() {
   const supabase = createClient()
 
   useEffect(() => {
-    const establishRecoverySession = async () => {
-      const accessToken = searchParams.get('access_token')
-      const refreshToken = searchParams.get('refresh_token')
-      const type = searchParams.get('type')
-      
-      console.log('Reset password page parameters:', {
-        accessToken: accessToken ? 'present' : 'missing',
-        refreshToken: refreshToken ? 'present' : 'missing',
-        type
-      })
-
-      if (!accessToken || type !== 'recovery') {
-        setError('Invalid or missing reset token. Please use the link from your email.')
-        setVerifying(false)
-        return
-      }
-
+    const checkSession = async () => {
       try {
         setVerifying(true)
         
-        // Set the session using the access token from Supabase
-        const { data: { session }, error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || ''
-        })
-
-        if (sessionError) {
-          console.error('Session error:', sessionError)
-          throw new Error(`Failed to establish recovery session: ${sessionError.message}`)
+        // Check if we have a verified session from callback
+        const verified = searchParams.get('verified')
+        if (verified === 'true') {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            console.log('✓ Verified session found')
+            setVerifying(false)
+            return
+          }
         }
 
-        if (!session) {
-          throw new Error('No session established')
+        // Fallback: Check for access token in URL params
+        const accessToken = searchParams.get('access_token')
+        const refreshToken = searchParams.get('refresh_token')
+        const type = searchParams.get('type')
+        
+        if (accessToken && type === 'recovery') {
+          console.log('Setting session from URL params...')
+          
+          const { data: { session }, error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || ''
+          })
+
+          if (sessionError) {
+            throw new Error(`Failed to establish recovery session: ${sessionError.message}`)
+          }
+
+          if (!session) {
+            throw new Error('No session established')
+          }
+
+          console.log('✓ Recovery session established')
+          setVerifying(false)
+          return
         }
 
-        console.log('Recovery session established successfully')
-        setVerifying(false)
+        // Check if we already have a session
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          console.log('✓ Existing session found')
+          setVerifying(false)
+          return
+        }
+
+        throw new Error('No valid session found. Please use the link from your email.')
 
       } catch (err: any) {
-        console.error('Session establishment error:', err)
+        console.error('Session check error:', err)
         setError(err.message || 'Invalid or expired reset link. Please request a new one.')
         setVerifying(false)
       }
     }
 
-    establishRecoverySession()
+    checkSession()
   }, [searchParams, supabase.auth])
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -84,6 +97,7 @@ export default function ResetPassword() {
     setError('')
 
     try {
+      console.log('Updating password...')
       const { error: updateError } = await supabase.auth.updateUser({
         password: password
       })
@@ -92,13 +106,14 @@ export default function ResetPassword() {
         throw updateError
       }
 
+      console.log('✓ Password updated successfully')
       setMessage('Password updated successfully! Redirecting to login...')
       
       // Sign out and redirect to login
       await supabase.auth.signOut()
       
       setTimeout(() => {
-        router.push('/login')
+        router.push('/login?message=Password updated successfully. Please log in with your new password.')
       }, 2000)
 
     } catch (err: any) {
@@ -109,11 +124,7 @@ export default function ResetPassword() {
     }
   }
 
-  const handleRequestNewLink = () => {
-    router.push('/forgot-password')
-  }
-
-  // Show loading while verifying token
+  // Show loading while verifying session
   if (verifying) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -130,7 +141,7 @@ export default function ResetPassword() {
     )
   }
 
-  // Show error if token verification failed
+  // Show error if session verification failed
   if (error && !verifying) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -147,7 +158,7 @@ export default function ResetPassword() {
           
           <div className="mt-8 space-y-4">
             <button
-              onClick={handleRequestNewLink}
+              onClick={() => router.push('/forgot-password')}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
             >
               Request New Reset Link

@@ -64,29 +64,20 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { pathname, searchParams, hash } = request.nextUrl
+  const { pathname, searchParams } = request.nextUrl
 
   // Check if the current path is public
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
   const isAuthPath = authPaths.some(path => pathname.startsWith(path))
 
-  // Special case: allow reset-password with ANY parameters or hash (for password reset flow)
-  const isResetPasswordPage = pathname === '/reset-password'
-  
-  // Special case: check if this is coming from Supabase verification with hash parameters
-  const hasHashParams = hash.includes('access_token') || hash.includes('type=recovery')
-
-   // In your middleware, ensure this check exists:
-const isResetPasswordWithToken = pathname === '/reset-password' && searchParams.has('token')
-
-if (isPublicPath || isResetPasswordWithToken) {
-  return response
-}
+  // Allow all public paths without session check
+  if (isPublicPath) {
+    return response
+  }
 
   const {
     data: { session },
   } = await supabase.auth.getSession()
-
 
   // If user is not logged in and tries to access a protected route, redirect to login
   if (!session && !isAuthPath) {
