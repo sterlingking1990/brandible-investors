@@ -50,16 +50,31 @@ export default function Home() {
   const [redirecting, setRedirecting] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+
+  // Check if user has set up a password
+  useEffect(() => {
+    const checkPasswordStatus = async () => {
+      if (session?.user) {
+        // Check if user has a password by looking at their auth metadata
+        // Users created via admin.createUser without password will have different metadata
+        const isFirstTimeSetup = !session.user.user_metadata?.password_set;
+        setHasPassword(!isFirstTimeSetup);
+      }
+    };
+    checkPasswordStatus();
+  }, [session]);
 
   const handlePasswordUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setPasswordError(null);
     setPasswordSuccess(false);
 
-    // First, reauthenticate the user with their current password
-    if (session?.user?.email) {
+    // For existing password users, reauthenticate first
+    if (hasPassword && session?.user?.email) {
       const { error: reauthError } = await supabase.auth.signInWithPassword({
         email: session.user.email,
         password: currentPassword,
@@ -71,6 +86,11 @@ export default function Home() {
       }
     }
 
+    // For first-time setup, check password confirmation
+    if (!hasPassword && newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
 
     if (newPassword.length < 6) {
       setPasswordError("Password must be at least 6 characters long");
@@ -79,6 +99,7 @@ export default function Home() {
 
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
+      data: { password_set: true }
     });
 
     if (updateError) {
@@ -87,8 +108,10 @@ export default function Home() {
       setPasswordSuccess(true);
       setCurrentPassword("");
       setNewPassword("");
+      setConfirmPassword("");
+      setHasPassword(true);
 
-        // Refresh session to ensure it stays valid
+      // Refresh session to ensure it stays valid
       await supabase.auth.refreshSession();
     }
   };
@@ -448,31 +471,52 @@ export default function Home() {
                 </div>
               </div>
               <div className="mt-6">
-                <h4 className="text-md font-semibold text-gray-800 mb-2">Reset Password</h4>
+                <h4 className="text-md font-semibold text-gray-800 mb-2">
+                  {hasPassword === false ? 'Set Up Your Password' : 'Change Password'}
+                </h4>
+                
+                {hasPassword === false && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-blue-700">
+                      Welcome! Please set up your password to secure your account.
+                    </p>
+                  </div>
+                )}
+
                 <form onSubmit={handlePasswordUpdate} className="space-y-4">
                   {passwordError && <p className="text-red-500 text-sm">{passwordError}</p>}
-                  {passwordSuccess && <p className="text-green-500 text-sm">Password updated successfully!</p>}
-                  <div>
-                    <label
-                      htmlFor="currentPassword"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Current Password
-                    </label>
-                    <input
-                      type="password"
-                      id="currentPassword"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    />
-                  </div>
+                  {passwordSuccess && (
+                    <p className="text-green-500 text-sm">
+                      {hasPassword === false ? 'Password set up successfully!' : 'Password updated successfully!'}
+                    </p>
+                  )}
+                  
+                  {/* Show current password field only if user has already set a password */}
+                  {hasPassword === true && (
+                    <div>
+                      <label
+                        htmlFor="currentPassword"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Current Password
+                      </label>
+                      <input
+                        type="password"
+                        id="currentPassword"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        required
+                      />
+                    </div>
+                  )}
+                  
                   <div>
                     <label
                       htmlFor="newPassword"
                       className="block text-sm font-medium text-gray-700"
                     >
-                      New Password
+                      {hasPassword === false ? 'Password' : 'New Password'}
                     </label>
                     <input
                       type="password"
@@ -480,13 +524,38 @@ export default function Home() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      minLength={6}
+                      required
                     />
+                    <p className="mt-1 text-xs text-gray-500">Must be at least 6 characters long</p>
                   </div>
+
+                  {/* Show confirm password field only for first-time setup */}
+                  {hasPassword === false && (
+                    <div>
+                      <label
+                        htmlFor="confirmPassword"
+                        className="block text-sm font-medium text-gray-700"
+                      >
+                        Confirm Password
+                      </label>
+                      <input
+                        type="password"
+                        id="confirmPassword"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        minLength={6}
+                        required
+                      />
+                    </div>
+                  )}
+
                   <button
                     type="submit"
                     className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    Update Password
+                    {hasPassword === false ? 'Set Password' : 'Update Password'}
                   </button>
                 </form>
               </div>
